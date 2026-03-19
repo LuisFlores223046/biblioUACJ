@@ -79,4 +79,4 @@ Descarga el ZIP directamente:
 
 ---
 
-*Equipo Líder: Luis Flores · UACJ 2025*
+*Equipo Líder: Luis Flores, Evelyn Bravo, Rogelio Saucedo· UACJ 2025*
