@@ -48,10 +48,59 @@ def top_libros(db: Session = Depends(get_db)):
 def usuarios_activos(db: Session = Depends(get_db)):
     pass
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from database import get_db, Prestamo, Libro, Usuario
+from typing import List
+
+router = APIRouter()
+
 @router.get("/por-fecha", summary="R9.3 Préstamos por fecha")
 def prestamos_por_fecha(fecha: str, db: Session = Depends(get_db)):
-    pass
+
+    try:
+        # Filtramos comparando solo la parte de la fecha (date) del campo DateTime
+        resultados = db.query(Prestamo).filter(
+            func.date(Prestamo.fecha_prestamo) == fecha
+        ).all()
+        
+        if not resultados:
+            return {"message": f"No se encontraron préstamos para la fecha {fecha}", "data": []}
+            
+        return resultados
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
 
 @router.get("/estadisticas", summary="R9.4 Estadísticas generales")
 def estadisticas(db: Session = Depends(get_db)):
-    pass
+
+    # Consultas de Libros
+    total_libros = db.query(Libro).count()
+    libros_disponibles = db.query(Libro).filter(Libro.disponible == True).count()
+
+    # Consultas de Usuarios
+    total_usuarios = db.query(Usuario).count()
+    usuarios_activos = db.query(Usuario).filter(Usuario.activo == True).count()
+
+    # Consultas de Préstamos
+    total_prestamos = db.query(Prestamo).count()
+    prestamos_activos = db.query(Prestamo).filter(Prestamo.devuelto == False).count()
+
+    return {
+        "libros": {
+            "total": total_libros,
+            "disponibles": libros_disponibles,
+            "prestados": total_libros - libros_disponibles
+        },
+        "usuarios": {
+            "total": total_usuarios,
+            "activos": usuarios_activos,
+            "inactivos": total_usuarios - usuarios_activos
+        },
+        "prestamos": {
+            "total_historico": total_prestamos,
+            "activos_actualmente": prestamos_activos,
+            "finalizados": total_prestamos - prestamos_activos
+        }
+    }
