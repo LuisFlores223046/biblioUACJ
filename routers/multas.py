@@ -23,10 +23,11 @@ from fastapi import HTTPException
 
 
 @router.get("/calcular/{prestamo_id}", summary="R7.1 Calcular multa")
-# Autor: Raúl Esteban Aniles Macias
-# Matrícula: 12345678 (reemplazar con número real si aplica)
-# Funcionalidad: Calcula la multa de un préstamo según días de retraso (5 pesos/día a partir del día 8).
 def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
+    """
+    Autor: Raúl Esteban Aniles Macias 222802
+    # Funcionalidad: Calcula la multa de un préstamo según días de retraso (5 pesos/día a partir del día 8).
+    """
     prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
@@ -66,9 +67,9 @@ def pagar_multa(prestamo_id: int, db: Session = Depends(get_db)):
     pass
 
 @router.get("/total", summary="R7.4 Total de multas")
-# Autor: Raúl Esteban Aniles Macias
-# Matrícula: 12345678 (reemplazar con número real si aplica)
-# Funcionalidad: Retorna el total acumulado de multas registradas en el sistema.
 def total_multas(db: Session = Depends(get_db)):
+    """Autor: Raúl Esteban Aniles Macias 222802
+    # Funcionalidad: Retorna el total acumulado de multas registradas en el sistema.
+    """
     total = db.query(Prestamo).with_entities(func.sum(Prestamo.multa)).scalar() or 0.0
     return {"total_multas": float(total)}
