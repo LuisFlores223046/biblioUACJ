@@ -7,7 +7,7 @@ Requerimientos:
   R1.4 Actualizar datos de un libro
   R1.5 Eliminar un libro
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from database import get_db, Libro
@@ -22,15 +22,44 @@ class LibroCreate(BaseModel):
 
 # TODO Equipo 1: Implementar los endpoints ↓
 
-@router.post("/", summary="R1.1 Registrar libro")
+@router.post("/", summary="R1.1 Registrar libro", status_code=status.HTTP_201_CREATED)
 def crear_libro(libro: LibroCreate, db: Session = Depends(get_db)):
-    # Implementar aquí
-    pass
+    """
+    registrmos un nuevo libro 
+    nos aseguramos de que no existan libros con el mismo ISBN que es su id
+    si existe lanzamos un error 400
+    y si no existe lo creamos
+    """
+    existente = db.query(Libro).filter(Libro.isbn == libro.isbn).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Ya existe un libro con ese ISBN")
+
+    nuevo_libro = Libro(
+        titulo=libro.titulo,
+        autor=libro.autor,
+        isbn=libro.isbn,
+        cantidad=libro.cantidad,
+    )
+    db.add(nuevo_libro)
+    db.commit()
+    db.refresh(nuevo_libro)
+
+    return {
+        "id": nuevo_libro.id,
+        "titulo": nuevo_libro.titulo,
+        "autor": nuevo_libro.autor,
+        "isbn": nuevo_libro.isbn,
+        "cantidad": nuevo_libro.cantidad,
+        "disponible": nuevo_libro.disponible,
+    }
+
 
 @router.get("/", summary="R1.2 Listar todos los libros")
 def listar_libros(db: Session = Depends(get_db)):
-    # Implementar aquí
-    pass
+    """
+    retornamos todos los libros que existen en la base de datos
+    """
+    return db.query(Libro).all()
 
 @router.get("/{libro_id}", summary="R1.3 Consultar libro por ID")
 def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
