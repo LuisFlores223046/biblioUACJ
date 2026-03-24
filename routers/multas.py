@@ -22,6 +22,9 @@ from fastapi import HTTPException
 
 
 @router.get("/calcular/{prestamo_id}", summary="R7.1 Calcular multa")
+# Autor: Raúl Esteban Aniles Macias
+# Matrícula: 12345678 (reemplazar con número real si aplica)
+# Funcionalidad: Calcula la multa de un préstamo según días de retraso (5 pesos/día a partir del día 8).
 def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
     prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
     if not prestamo:
