@@ -68,8 +68,36 @@ def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{libro_id}", summary="R1.4 Actualizar libro")
 def actualizar_libro(libro_id: int, libro: LibroCreate, db: Session = Depends(get_db)):
-    # Implementar aquí
-    pass
+    """
+    Actualiza los datos de un libro por su ID.
+
+    - `libro_id`: identificador del libro a actualizar.
+    - `libro`: nuevo contenido del libro.
+    """
+    libro_db = db.query(Libro).filter(Libro.id == libro_id).first()
+    if not libro_db:
+        raise HTTPException(status_code=404, detail="Libro no encontrado")
+
+    libro_db.titulo = libro.titulo
+    libro_db.autor = libro.autor
+    libro_db.isbn = libro.isbn
+    libro_db.cantidad = libro.cantidad
+    libro_db.disponible = libro.cantidad > 0
+
+    db.commit()
+    db.refresh(libro_db)
+
+    return {
+        "mensaje": "Libro actualizado correctamente",
+        "libro": {
+            "id": libro_db.id,
+            "titulo": libro_db.titulo,
+            "autor": libro_db.autor,
+            "isbn": libro_db.isbn,
+            "cantidad": libro_db.cantidad,
+            "disponible": libro_db.disponible,
+        },
+    }
 
 @router.delete("/{libro_id}", summary="R1.5 Eliminar libro")
 def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
