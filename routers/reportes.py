@@ -6,7 +6,7 @@ Requerimientos:
   R9.3 Reporte de préstamos por fecha
   R9.4 Estadísticas generales del sistema
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from database import get_db, Prestamo, Libro, Usuario
@@ -46,61 +46,76 @@ def top_libros(db: Session = Depends(get_db)):
 
 @router.get("/usuarios-activos", summary="R9.2 Usuarios con más préstamos")
 def usuarios_activos(db: Session = Depends(get_db)):
-    pass
+    """
+    Usuarios con mas prestamos
+    """
+    # Consulta
+    resultados = (
+        db.query(
+            Usuario.id,
+            Usuario.nombre,
+            func.count(Prestamo.id).label("total_prestamos")
+        )
+        # JOIN entre Usuario y Prestamo usando usuario_id
+        .join(Prestamo, Prestamo.usuario_id == Usuario.id)
+        .group_by(Usuario.id, Usuario.nombre)
+        .order_by(desc("total_prestamos"))
+        .limit(5)
+        .all()
+    )
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from database import get_db, Prestamo, Libro, Usuario
-from typing import List
+    usuarios = []
+    for usuario in resultados:
+        usuarios.append({
+            "usuario_id": usuario.id,
+            "nombre": usuario.nombre,
+            "prestamos": usuario.total_prestamos
+        })
 
-router = APIRouter()
+    return {"usuarios_activos": usuarios}
 
 @router.get("/por-fecha", summary="R9.3 Préstamos por fecha")
 def prestamos_por_fecha(fecha: str, db: Session = Depends(get_db)):
-
+    """Busca préstamos por fecha específica (YYYY-MM-DD)."""
     try:
-        # Filtramos comparando solo la parte de la fecha (date) del campo DateTime
         resultados = db.query(Prestamo).filter(
             func.date(Prestamo.fecha_prestamo) == fecha
         ).all()
         
         if not resultados:
             return {"message": f"No se encontraron préstamos para la fecha {fecha}", "data": []}
-            
         return resultados
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
 
 @router.get("/estadisticas", summary="R9.4 Estadísticas generales")
 def estadisticas(db: Session = Depends(get_db)):
+    pass
+    """Recuperar el total de libros, usuarios y préstamos, y separar préstamos activos y devueltos para 
+    generar un resumen general del sistema"""
 
-    # Consultas de Libros
-    total_libros = db.query(Libro).count()
-    libros_disponibles = db.query(Libro).filter(Libro.disponible == True).count()
+    #Recuperar el total de libros, usuarios y préstamos
+    libros = db.query(Libro).all()
+    total_libros = len(libros)
+    usuarios = db.query(Usuario).all()
+    total_usuarios = len(usuarios)
+    prestamos = db.query(Prestamo).all()
+    total_prestamos = len(prestamos)
+    prestamos_activos = 0
+    prestamos_devueltos = 0
 
-    # Consultas de Usuarios
-    total_usuarios = db.query(Usuario).count()
-    usuarios_activos = db.query(Usuario).filter(Usuario.activo == True).count()
+    #Separar préstamos activos y devueltos
+    for prestamo in prestamos:
+        if prestamo.fecha_devolucion is None:  
+            prestamos_activos += 1
+        else:
+            prestamos_devueltos += 1
 
-    # Consultas de Préstamos
-    total_prestamos = db.query(Prestamo).count()
-    prestamos_activos = db.query(Prestamo).filter(Prestamo.devuelto == False).count()
-
+    #Devolver resumen general del sistema
     return {
-        "libros": {
-            "total": total_libros,
-            "disponibles": libros_disponibles,
-            "prestados": total_libros - libros_disponibles
-        },
-        "usuarios": {
-            "total": total_usuarios,
-            "activos": usuarios_activos,
-            "inactivos": total_usuarios - usuarios_activos
-        },
-        "prestamos": {
-            "total_historico": total_prestamos,
-            "activos_actualmente": prestamos_activos,
-            "finalizados": total_prestamos - prestamos_activos
-        }
+        "total_libros": total_libros,
+        "total_usuarios": total_usuarios,
+        "total_prestamos": total_prestamos,
+        "prestamos_activos": prestamos_activos,
+        "prestamos_devueltos": prestamos_devueltos
     }
