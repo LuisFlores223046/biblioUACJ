@@ -63,8 +63,17 @@ def listar_libros(db: Session = Depends(get_db)):
 
 @router.get("/{libro_id}", summary="R1.3 Consultar libro por ID")
 def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
-    # Implementar aquí
-    pass
+    """
+    **Consultar un libro específico por su identificador único.**
+
+    - **libro_id**: El ID numérico del libro almacenado en la base de datos.
+    - **Retorna**: Los detalles del libro si existe, de lo contrario lanza un error 404.
+    """
+    libro_db = db.query(Libro).filter(Libro.id == libro_id).first()
+    if not libro_db:
+        raise HTTPException(status_code=404, detail="Libro no encontrado")
+
+    return libro_db
 
 @router.put("/{libro_id}", summary="R1.4 Actualizar libro")
 def actualizar_libro(libro_id: int, libro: LibroCreate, db: Session = Depends(get_db)):
@@ -101,5 +110,18 @@ def actualizar_libro(libro_id: int, libro: LibroCreate, db: Session = Depends(ge
 
 @router.delete("/{libro_id}", summary="R1.5 Eliminar libro")
 def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
-    # Implementar aquí
-    pass
+    """
+    **Eliminar un libro de la base de datos de forma permanente.**
+
+    - **libro_id**: El ID del libro que se desea borrar.
+    - **Validación**: Si el ID no existe, se retorna un error 404.
+    - **Resultado**: Confirmación de la eliminación exitosa.
+    """
+    libro_db = db.query(Libro).filter(Libro.id == libro_id).first()
+    if not libro_db:
+        raise HTTPException(status_code=404, detail="Libro no encontrado")
+
+    db.delete(libro_db)
+    db.commit()
+
+    return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
