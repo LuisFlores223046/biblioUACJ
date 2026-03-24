@@ -28,12 +28,14 @@ def inventario_completo(db: Session = Depends(get_db)):
     """
     libros = db.query(Libro).all()
     
+    print("LIBROS:", libros)
+    print("TOTAL:", len(libros))
+    
     resultado = []
     for libro in libros:
-        # Cuántos préstamos activos (no devueltos) tiene este libro
         prestamos_activos = (
             db.query(func.count(Prestamo.id))
-            .filter(Prestamo.libro_id==libro.id,Prestamo.devuelto==False)
+            .filter(Prestamo.libro_id==libro.id, Prestamo.devuelto==False)
             .scalar()
         )
         resultado.append({
@@ -41,14 +43,15 @@ def inventario_completo(db: Session = Depends(get_db)):
             "titulo":libro.titulo,
             "autor":libro.autor,
             "isbn":libro.isbn,
-            "cantidad":libro.cantidad, #stock total
-            "disponible":libro.disponible, #bool: se puede prestar?
-            "prestados":prestamos_activos #calculado en tiempo real
+            "cantidad":libro.cantidad,
+            "disponible":libro.disponible,
+            "prestados":prestamos_activos
         })
-        return{
-            "total_libros":len(resultado),
-            "libros":resultado, 
-        }
+
+    return {
+        "total_libros": len(resultado),
+        "libros": resultado, 
+    }
 
 @router.get("/stock-bajo", summary="R8.2 Libros con stock bajo")
 def stock_bajo(db: Session = Depends(get_db)):
