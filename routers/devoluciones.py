@@ -7,21 +7,39 @@ Requerimientos Iteración 1:
   R4.4 Listar devoluciones del día
 
 Requerimientos Iteración 2:
-  R4.5 Calcular multa escalonada al devolver
+  R4.5 Calcular multa escalonada al devolver (días 1-7 sin costo, día 8+ $5/día)
   R4.6 Listar devoluciones que generaron multa mayor a $0
   R4.7 Contar devoluciones en un rango de fechas
   R4.8 Promedio de días que tardan los usuarios en devolver
 """
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date
+from typing import List, Optional
+from pydantic import BaseModel
 from database import get_db, Prestamo, Libro
 
-router = APIRouter()
+# ---------------------------------------------------------------------------
+# Esquema de respuesta (aportado por el equipo en la rama remota)
+# ---------------------------------------------------------------------------
+class DevolucionResponse(BaseModel):
+    id: int
+    libro_id: int
+    usuario_id: int
+    fecha_prestamo: date
+    fecha_devolucion: Optional[date]
+    multa: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+# Router con prefix y tags para que aparezca organizado en /docs
+router = APIRouter(prefix="/devoluciones", tags=["Devoluciones"])
+
 
 # ---------------------------------------------------------------------------
 # Función auxiliar para R4.5
+# Días 1-7 → sin costo | Día 8 en adelante → $5 por día extra
 # ---------------------------------------------------------------------------
 def _calcular_multa(dias: int) -> float:
     if dias <= 7:
@@ -70,7 +88,7 @@ def devolver_libro(prestamo_id: int, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# R4.2 — Calcular retraso (sin cambios)
+# R4.2 — Calcular retraso
 # ---------------------------------------------------------------------------
 @router.get("/{prestamo_id}/retraso", summary="R4.2 Calcular retraso")
 def consultar_retraso(prestamo_id: int, db: Session = Depends(get_db)):
@@ -83,9 +101,9 @@ def consultar_retraso(prestamo_id: int, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# R4.3 — Marcar libro como disponible (sin cambios)
+# R4.3 — Marcar libro como disponible manualmente
 # ---------------------------------------------------------------------------
-@router.patch("/{libro_id}/disponibilidad", summary="R4.3 Marcar libro")
+@router.patch("/{libro_id}/disponibilidad", summary="R4.3 Marcar libro como disponible")
 def marcar_disponible(libro_id: int, db: Session = Depends(get_db)):
     libro = db.query(Libro).filter(Libro.id == libro_id).first()
     if not libro:
@@ -153,6 +171,7 @@ def devoluciones_con_multa(db: Session = Depends(get_db)):
 
 # ---------------------------------------------------------------------------
 # R4.7 — Contar devoluciones en un rango de fechas
+# Uso: /devoluciones/rango?fecha_inicio=2026-03-01&fecha_fin=2026-03-24
 # ---------------------------------------------------------------------------
 @router.get("/rango", summary="R4.7 Devoluciones en un rango de fechas")
 def devoluciones_por_rango(
