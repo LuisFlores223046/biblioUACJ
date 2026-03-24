@@ -66,4 +66,7 @@ def prestamos_activos(db: Session = Depends(get_db)):
 
 @router.get("/{prestamo_id}", summary="R3.4 Consultar préstamo")
 def obtener_prestamo(prestamo_id: int, db: Session = Depends(get_db)):
-    pass
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
+    if not prestamo:
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
+    return prestamo
