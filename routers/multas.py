@@ -18,9 +18,40 @@ DIAS_LIMITE = 7  # días antes de generar multa
 
 # TODO Equipo 7: Implementar los endpoints ↓
 
+from fastapi import HTTPException
+
+
 @router.get("/calcular/{prestamo_id}", summary="R7.1 Calcular multa")
 def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
-    pass
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
+    if not prestamo:
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
+
+    if prestamo.devuelto and prestamo.fecha_devolucion:
+        fecha_final = prestamo.fecha_devolucion
+    else:
+        fecha_final = datetime.utcnow()
+
+    dias_prestamo = (fecha_final - prestamo.fecha_prestamo).days
+    dias_retraso = dias_prestamo - DIAS_LIMITE
+    multa_calculada = max(0, dias_retraso * COSTO_DIA)
+
+    # Guardar multa calculada para persistencia si aún no está actualizada
+    if prestamo.multa != multa_calculada:
+        prestamo.multa = multa_calculada
+        db.add(prestamo)
+        db.commit()
+        db.refresh(prestamo)
+
+    return {
+        "prestamo_id": prestamo_id,
+        "dias_prestamo": dias_prestamo,
+        "dias_retraso": max(0, dias_retraso),
+        "multa": multa_calculada,
+        "estado_devuelto": prestamo.devuelto,
+        "fecha_devolucion": prestamo.fecha_devolucion,
+    }
+
 
 @router.get("/usuario/{usuario_id}", summary="R7.2 Multas de usuario")
 def multas_usuario(usuario_id: int, db: Session = Depends(get_db)):
