@@ -25,7 +25,10 @@ def crear_prestamo(prestamo: PrestamoCreate, db: Session = Depends(get_db)):
 
 @router.get("/activos", summary="R3.3 Listar préstamos activos")
 def prestamos_activos(db: Session = Depends(get_db)):
-    pass
+    prestamos = db.query(Prestamo).filter(Prestamo.devuelto == False).all()
+    if not prestamos:
+        raise HTTPException(status_code=404, detail="No hay préstamos activos")
+    return prestamos
 
 @router.get("/{prestamo_id}", summary="R3.4 Consultar préstamo")
 def obtener_prestamo(prestamo_id: int, db: Session = Depends(get_db)):
