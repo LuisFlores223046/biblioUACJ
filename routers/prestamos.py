@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from database import get_db, Prestamo, Libro, Usuario
-
 router = APIRouter()
 
 class PrestamoCreate(BaseModel):
@@ -25,9 +24,12 @@ def crear_prestamo(prestamo: PrestamoCreate, db: Session = Depends(get_db)):
 
 @router.get("/activos", summary="R3.3 Listar préstamos activos")
 def prestamos_activos(db: Session = Depends(get_db)):
+    # Obtiene los préstamos no devueltos
     prestamos = db.query(Prestamo).filter(Prestamo.devuelto == False).all()
+    # Verificar si hay resultados
     if not prestamos:
         raise HTTPException(status_code=404, detail="No hay préstamos activos")
+    # Devuelve los préstamos
     return prestamos
 
 @router.get("/{prestamo_id}", summary="R3.4 Consultar préstamo")
