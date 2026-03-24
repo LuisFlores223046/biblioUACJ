@@ -7,6 +7,7 @@ Requerimientos:
   R7.4 Ver total de multas del sistema
 """
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime
 from database import get_db, Prestamo
@@ -65,5 +66,9 @@ def pagar_multa(prestamo_id: int, db: Session = Depends(get_db)):
     pass
 
 @router.get("/total", summary="R7.4 Total de multas")
+# Autor: Raúl Esteban Aniles Macias
+# Matrícula: 12345678 (reemplazar con número real si aplica)
+# Funcionalidad: Retorna el total acumulado de multas registradas en el sistema.
 def total_multas(db: Session = Depends(get_db)):
-    pass
+    total = db.query(Prestamo).with_entities(func.sum(Prestamo.multa)).scalar() or 0.0
+    return {"total_multas": float(total)}
