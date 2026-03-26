@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from database import get_db, Prestamo, Libro, Usuario
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -127,3 +128,43 @@ def estadisticas(db: Session = Depends(get_db)):
         "prestamos_activos": prestamos_activos,
         "prestamos_devueltos": prestamos_devueltos
     }
+
+
+
+@router.get("/usuarios-morosos", summary="R9.6 Reporte de usuarios morosos")
+def usuarios_morosos(db: Session = Depends(get_db)):
+    """
+    Usuarios con préstamos vencidos (+7 días) sin devolver.
+    Muestra el nombre del usuario y cuántos días lleva el préstamo sin devolverse.
+    """
+
+    fecha_limite = datetime.now() - timedelta(days=7)
+
+    prestamos_vencidos = (
+        db.query(Prestamo, Usuario)
+        .join(Usuario, Prestamo.usuario_id == Usuario.id)
+        .filter(
+            Prestamo.fecha_devolucion == None,
+            Prestamo.fecha_prestamo <= fecha_limite
+        )
+        .all()
+    )
+
+    if not prestamos_vencidos:
+        return {
+            "message": "No se encontraron usuarios morosos",
+            "usuarios_morosos": []
+        }
+
+    resultado = []
+
+    for prestamo, usuario in prestamos_vencidos:
+        dias = (datetime.now() - prestamo.fecha_prestamo).days
+
+        resultado.append({
+            "usuario_id": usuario.id,
+            "nombre": usuario.nombre,
+            "dias_vencido": dias
+        })
+
+    return {"usuarios_morosos": resultado}
