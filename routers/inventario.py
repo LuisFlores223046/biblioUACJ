@@ -28,12 +28,14 @@ def inventario_completo(db: Session = Depends(get_db)):
     """
     libros = db.query(Libro).all()
     
+    print("LIBROS:", libros)
+    print("TOTAL:", len(libros))
+    
     resultado = []
     for libro in libros:
-        # Cuántos préstamos activos (no devueltos) tiene este libro
         prestamos_activos = (
             db.query(func.count(Prestamo.id))
-            .filter(Prestamo.libro_id==libro.id,Prestamo.devuelto==False)
+            .filter(Prestamo.libro_id==libro.id, Prestamo.devuelto==False)
             .scalar()
         )
         resultado.append({
@@ -41,14 +43,15 @@ def inventario_completo(db: Session = Depends(get_db)):
             "titulo":libro.titulo,
             "autor":libro.autor,
             "isbn":libro.isbn,
-            "cantidad":libro.cantidad, #stock total
-            "disponible":libro.disponible, #bool: se puede prestar?
-            "prestados":prestamos_activos #calculado en tiempo real
+            "cantidad":libro.cantidad,
+            "disponible":libro.disponible,
+            "prestados":prestamos_activos
         })
-        return{
-            "total_libros":len(resultado),
-            "libros":resultado, 
-        }
+
+    return {
+        "total_libros": len(resultado),
+        "libros": resultado, 
+    }
 
 @router.get("/stock-bajo", summary="R8.2 Libros con stock bajo")
 def stock_bajo(db: Session = Depends(get_db)):
@@ -223,3 +226,124 @@ def resumen_inventario(db: Session = Depends(get_db)):
         "total_prestados":total_prestados, # prestamos activos
         "total_ejemplares_libres":total_ejemplares-total_prestados, # en estante
     }
+
+
+# ─── NUEVOS ENDPOINTS ITERACIÓN 2 ────────────────────────────────────────────
+
+@router.get("/disponibilidad-real", summary="R8.5 Disponibilidad real por libro")
+def disponibilidad_real(db: Session = Depends(get_db)):
+    """
+    Calcula la disponibilidad real de cada libro (cantidad total menos préstamos activos).
+    """
+    try:
+        libros = db.query(Libro).all()
+        resultado = []
+        for libro in libros:
+            prestamos_activos = db.query(func.count(Prestamo.id)).filter(
+                Prestamo.libro_id == libro.id,
+                Prestamo.devuelto == False
+            ).scalar() or 0
+            
+            disponibilidad = libro.cantidad - prestamos_activos
+            
+            resultado.append({
+                "libro_id": libro.id,
+                "titulo": libro.titulo,
+                "cantidad_total": libro.cantidad,
+                "prestamos_activos": prestamos_activos,
+                "disponibilidad_real": disponibilidad
+            })
+        return resultado
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al calcular disponibilidad: {str(e)}")
+
+@router.get("/estado-critico", summary="R8.6 Libros en estado crítico")
+def libros_estado_critico(db: Session = Depends(get_db)):
+    """
+    Lista los libros cuya disponibilidad real es menor o igual a 1.
+    """
+    try:
+        libros = db.query(Libro).all()
+        resultado = []
+        for libro in libros:
+            prestamos_activos = db.query(func.count(Prestamo.id)).filter(
+                Prestamo.libro_id == libro.id,
+                Prestamo.devuelto == False
+            ).scalar() or 0
+            
+            disponibilidad = libro.cantidad - prestamos_activos
+            
+            if disponibilidad <= 1:
+                resultado.append({
+                    "libro_id": libro.id,
+                    "titulo": libro.titulo,
+                    "cantidad_total": libro.cantidad,
+                    "prestamos_activos": prestamos_activos,
+                    "disponibilidad_real": disponibilidad
+                })
+        return resultado
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener estado crítico: {str(e)}")
+
+@router.get("/extremos", summary="R8.7 Libro más y menos prestado")
+def extremos_prestamos(db: Session = Depends(get_db)):
+    """
+    Regresa el libro que más se ha prestado y el que menos se ha prestado en la historia.
+    """
+    try:
+        estadisticas = db.query(
+            Libro.id, 
+            Libro.titulo, 
+            func.count(Prestamo.id).label('total_prestamos')
+        ).outerjoin(Prestamo).group_by(Libro.id).all()
+
+        if not estadisticas:
+            raise HTTPException(status_code=404, detail="No hay datos suficientes en el inventario.")
+
+        estadisticas_ordenadas = sorted(estadisticas, key=lambda x: x.total_prestamos)
+        
+        menos_prestado = estadisticas_ordenadas[0]
+        mas_prestado = estadisticas_ordenadas[-1]
+
+        return {
+            "mas_prestado": {
+                "libro_id": mas_prestado.id,
+                "titulo": mas_prestado.titulo,
+                "total_veces_prestado": mas_prestado.total_prestamos
+            },
+            "menos_prestado": {
+                "libro_id": menos_prestado.id,
+                "titulo": menos_prestado.titulo,
+                "total_veces_prestado": menos_prestado.total_prestamos
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al calcular extremos: {str(e)}")
+
+@router.get("/ocupacion", summary="R8.8 Resumen de ocupación")
+def resumen_ocupacion(db: Session = Depends(get_db)):
+    """
+    Devuelve un resumen con el total de libros, ejemplares, préstamos actuales y porcentaje de ocupación.
+    """
+    try:
+        total_libros = db.query(func.count(Libro.id)).scalar() or 0
+        ejemplares_totales = db.query(func.sum(Libro.cantidad)).scalar() or 0
+        
+        prestados_actualmente = db.query(func.count(Prestamo.id)).filter(
+            Prestamo.devuelto == False
+        ).scalar() or 0
+        
+        porcentaje_ocupacion = 0.0
+        if ejemplares_totales > 0:
+            porcentaje_ocupacion = (prestados_actualmente / ejemplares_totales) * 100
+
+        return {
+            "total_libros_distintos": total_libros,
+            "ejemplares_totales": ejemplares_totales,
+            "prestados_actualmente": prestados_actualmente,
+            "porcentaje_ocupacion": round(porcentaje_ocupacion, 2)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al generar el reporte de ocupación: {str(e)}")
