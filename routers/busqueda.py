@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db, Libro
+from database import get_db, Libro, Usuario, Prestamo
 
 # Se crea el router que agrupa los endpoints del módulo de búsqueda
 router = APIRouter()
@@ -101,4 +101,92 @@ def buscar_isbn(isbn: str, db: Session = Depends(get_db)):
     if not libro:
         raise HTTPException(status_code=404, detail="Libro no encontrado")
 
-    return libro
+    return 
+    
+    # R5.5 Búsqueda general
+@router.get("/general/{texto}", summary="R5.5 Búsqueda general")
+def busqueda_general(texto: str, db: Session = Depends(get_db)):
+    """
+    Busca libros por título, autor o ISBN usando un solo parámetro.
+    """
+
+    resultados = db.query(Libro).filter(
+        (Libro.titulo.ilike(f"%{texto}%")) |
+        (Libro.autor.ilike(f"%{texto}%")) |
+        (Libro.isbn.ilike(f"%{texto}%"))
+    ).all()
+
+    if not resultados:
+        raise HTTPException(status_code=404, detail="No se encontraron resultados")
+
+    return resultados
+
+    # R5.6 Libros disponibles por autor
+@router.get("/autor-disponibles/{autor}", summary="R5.6 Libros disponibles de un autor")
+def autor_disponibles(autor: str, db: Session = Depends(get_db)):
+    """
+    Lista los libros disponibles de un autor específico.
+    """
+
+    resultados = db.query(Libro).filter(
+        Libro.autor.ilike(f"%{autor}%"),
+        Libro.disponible == 1
+    ).all()
+
+    if not resultados:
+        raise HTTPException(status_code=404, detail="No hay libros disponibles de ese autor")
+
+    return resultados
+
+    # R5.7 Libros prestados con usuario
+@router.get("/prestados", summary="R5.7 Libros prestados actualmente")
+def libros_prestados(db: Session = Depends(get_db)):
+    """
+    Lista los libros prestados actualmente mostrando el nombre del usuario.
+    """
+
+    prestamos = db.query(Prestamo, Libro, Usuario).join(
+        Libro, Prestamo.libro_id == Libro.id
+    ).join(
+        Usuario, Prestamo.usuario_id == Usuario.id
+    ).filter(
+        Prestamo.devuelto == False
+    ).all()
+
+    resultado = []
+
+    for prestamo, libro, usuario in prestamos:
+        resultado.append({
+            "libro_id": libro.id,
+            "titulo": libro.titulo,
+            "usuario": usuario.nombre
+        })
+
+    return resultado
+
+    # R5.8 Libros que ha pedido un usuario
+@router.get("/usuario/{usuario_id}", summary="R5.8 Libros por usuario")
+def libros_usuario(usuario_id: int, db: Session = Depends(get_db)):
+    """
+    Regresa todos los libros que un usuario ha pedido prestados.
+    """
+
+    prestamos = db.query(Prestamo, Libro).join(
+        Libro, Prestamo.libro_id == Libro.id
+    ).filter(
+        Prestamo.usuario_id == usuario_id
+    ).all()
+
+    resultado = []
+
+    for prestamo, libro in prestamos:
+        resultado.append({
+            "libro_id": libro.id,
+            "titulo": libro.titulo
+        })
+
+    if not resultado:
+        raise HTTPException(status_code=404, detail="El usuario no tiene préstamos")
+
+    return resultado
+    
