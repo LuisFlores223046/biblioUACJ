@@ -15,6 +15,7 @@ router = APIRouter()
 
 # TODO Equipo 8: Implementar los endpoints ↓
 
+#  R8.1 Ver inventario completo con disponibilidad
 @router.get("/", summary="R8.1 Inventario completo")
 def inventario_completo(db: Session = Depends(get_db)):
     """
@@ -53,6 +54,7 @@ def inventario_completo(db: Session = Depends(get_db)):
         "libros": resultado, 
     }
 
+#  R8.2 Ver libros con stock bajo (menos de 2 disponibles)
 @router.get("/stock-bajo", summary="R8.2 Libros con stock bajo")
 def stock_bajo(db: Session = Depends(get_db)):
     """
@@ -105,6 +107,7 @@ def stock_bajo(db: Session = Depends(get_db)):
         "libros": resultado,
     }
 
+#  R8.3 Actualizar cantidad de un libro
 @router.put("/{libro_id}/cantidad", summary="R8.3 Actualizar cantidad")
 def actualizar_cantidad(libro_id: int, cantidad: int, db: Session = Depends(get_db)):
     """
@@ -183,6 +186,7 @@ def actualizar_cantidad(libro_id: int, cantidad: int, db: Session = Depends(get_
     }
     
 
+#  R8.4 Ver resumen del inventario (total libros, disponibles, prestados)
 @router.get("/resumen", summary="R8.4 Resumen del inventario")
 def resumen_inventario(db: Session = Depends(get_db)):
     """
@@ -226,3 +230,44 @@ def resumen_inventario(db: Session = Depends(get_db)):
         "total_prestados":total_prestados, # prestamos activos
         "total_ejemplares_libres":total_ejemplares-total_prestados, # en estante
     }
+
+#ITERACION 2: NUEVOS ENDPOINTS PARA ANALISIS DE INVENTARIO    
+#  R8.5 Calcular disponibilidad real de cada libro: cantidad total menos préstamos activos actuales. No usar el campo disponible — calcularlo desde los préstamos. 
+@router.get("/disponibilidad-real", summary="R8.5 Disponiblidad real por libro")
+def disponibilidad_real(db:Session=Depends(get_db)):
+    """
+    Calcula la disponiblidad real de cada libro:
+        Disponibilidad_real = cantidad - prestamos_activos
+    No usa el campo 'Disponible;  del modelo
+    """
+    libros = db.query(Libro).all()
+    
+    resultado = []
+    for libro in libros:
+        prestamos_activos = (
+            db.query(func.count(Prestamo.id))
+            .filter(Prestamo.libro_id == libro.id, Prestamo.devuelto == False)
+            .scalar()
+        )
+        ejemplares_libres = libro.cantidad - prestamos_activos
+        
+        resultado.append({
+            "id": libro.id,
+            "titulo": libro.titulo,
+            "autor": libro.autor,
+            "isbn": libro.isbn,
+            "cantidad_total": libro.cantidad,
+            "prestados": prestamos_activos,
+            "disponibilidad_real": ejemplares_libres,
+        })
+        
+        return{
+            "Total_libros": len(resultado),
+            "Libros": resultado,
+        }
+
+#  R8.6 Listar libros en estado crítico: disponibilidad real menor o igual a 1. 
+
+#  R8.7 Regresar el libro más prestado y el menos prestado del inventario. 
+
+#  R8.8 Resumen: total de libros, ejemplares totales, prestados actualmente y porcentaje de ocupación. 
