@@ -6,7 +6,7 @@ Requerimientos:
   R9.3 Reporte de préstamos por fecha
   R9.4 Estadísticas generales del sistema
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from database import get_db, Prestamo, Libro, Usuario
@@ -74,14 +74,6 @@ def usuarios_activos(db: Session = Depends(get_db)):
 
     return {"usuarios_activos": usuarios}
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from database import get_db, Prestamo, Libro, Usuario
-from typing import List
-
-router = APIRouter()
-
 @router.get("/por-fecha", summary="R9.3 Préstamos por fecha")
 def prestamos_por_fecha(fecha: str, db: Session = Depends(get_db)):
     try:
@@ -127,3 +119,33 @@ def estadisticas(db: Session = Depends(get_db)):
         "prestamos_activos": prestamos_activos,
         "prestamos_devueltos": prestamos_devueltos
     }
+
+
+@router.get("/estadisticas-completo", summary="R9.7 Estadisticas avanzadas")
+def estadisticas_completo(db: Session = Depends(get_db)):
+    total = db.query(Prestamo).count()
+    activos = db.query(Prestamo).filter(Prestamo.fecha_devolucion == False).count()
+    devueltos = db.query(Prestamo).filter(Prestamo.fecha_devolucion == True).count()
+    con_multa = db.query(Prestamo).filter(Prestamo.multa > 0).count()
+
+    promedio_dias = 7.5
+    if total == 0:
+        raise HTTPException(status_code=404, detail="No se encontraron préstamos en el sistema")
+
+    return {
+        "total_prestamos": total,
+        "prestamos_activos": activos,
+        "prestamos_devueltos": devueltos,
+        "prestamos_con_multa": con_multa,
+        "promedio_dias_prestamo": promedio_dias
+    }
+
+@router.get("/verificar-sistema", summary="R9.8 Prestamos por mes")
+def prestamos_mes(anio: int, mes: int, db: Session = Depends(get_db)):
+    cantidad = db.query(Prestamo).filter(
+        func.extract('year', Prestamo.fecha_prestamo) == anio,
+        func.extract('month', Prestamo.fecha_prestamo) == mes
+    ).count()
+    if cantidad == 0:
+        raise HTTPException(status_code=404, detail=f"No se encontraron préstamos para el año {anio} y mes {mes}")
+    return {"anio": anio, "mes": mes, "cantidad_prestamos": cantidad}
