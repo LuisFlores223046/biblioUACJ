@@ -12,7 +12,7 @@ class UsuarioCreate(BaseModel):
     matricula: str
     email: str
 
-# --- ITERACIÓN 1: 
+# --- ITERACIÓN 1: Gestión Básica ---
 
 @router.post("/", summary="R2.1 Registrar usuario")
 def registrar_usuario(datos: UsuarioCreate, db: Session = Depends(get_db)):
@@ -64,7 +64,7 @@ def eliminar_usuario(usuario_id: int, db: Session = Depends(get_db)):
     return {"mensaje": "Usuario eliminado correctamente"}
 
 
-# --- ITERACIÓN 2
+# --- ITERACIÓN 2: Métricas y Reportes Avanzados ---
 
 @router.get("/reporte/con-prestamos", summary="R2.6 Usuarios con préstamos activos")
 def usuarios_con_prestamos_activos(db: Session = Depends(get_db)):
@@ -104,4 +104,3 @@ def usuario_top(db: Session = Depends(get_db)):
     if not res:
         return {"error": "No hay datos"}
     return {"usuario": res[0].nombre, "total_prestamos": res[1]}
- 
