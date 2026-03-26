@@ -127,3 +127,48 @@ def estadisticas(db: Session = Depends(get_db)):
         "prestamos_activos": prestamos_activos,
         "prestamos_devueltos": prestamos_devueltos
     }
+"""
+R9.5 — Top libros más prestados con título, autor y número de préstamos, ordenado de mayor a menor. 
+
+    Verificar: Libro id=1 primero con 3 préstamos. 
+"""
+@router.get("/top-libros-mayor-a-menor", summary="R9.5 Top 5 libros más prestados con título, autor y número de préstamos, ordenado de mayor a menor")
+def top_libros_mayor_a_menor(db: Session = Depends(get_db)):
+    try:
+        resultados = (
+            db.query(
+                Libro.id.label("libro_id"),
+                Libro.titulo,
+                Libro.autor,
+                func.count(Prestamo.id).label("prestamos")
+            )
+            .join(Prestamo, Prestamo.libro_id == Libro.id)
+            .group_by(Libro.id, Libro.titulo, Libro.autor)
+            .order_by(func.count(Prestamo.id).desc())
+            .all()
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el top de libros: {str(e)}"
+        )
+
+    # ← Validación FUERA del try, para que no sea atrapada
+    if not resultados:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontraron préstamos registrados."
+        )
+
+    top_libros = [
+        {
+            "libro_id": r.libro_id,
+            "titulo": r.titulo,
+            "autor": r.autor,
+            "prestamos": r.prestamos
+        }
+        for r in resultados
+    ]
+
+    return {"top_libros": top_libros}
