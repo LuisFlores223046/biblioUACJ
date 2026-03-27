@@ -198,6 +198,16 @@ def usuarios_multados(db:Session = Depends(get_db)):
         .filter(Usuario.id.in_(prestamos)).all() 
     return usuarios
 
+@router.get("/usuario_bloqueado/{usuario_id}", summary="R7.7 Verificar usuario Bloqueado")
+def usuarios_bloqueados(usuario_id: int, db: Session = Depends(get_db)):
+    """ Autor: Enrique Alejandro Pereda Meraz 223121
+    #### Funcionalidad: Verifica si un usuario está bloqueado por tener multas superiores a 20 
+    ."""
+    if  db.query(Prestamo).filter(Prestamo.usuario_id == usuario_id, Prestamo.multa > 20.0).count() > 0:
+        return {"usuario_id": usuario_id, "bloqueado": True, "mensaje": "El usuario está bloqueado por multas superiores a 20 pesos"}
+    else:
+        return {"usuario_id": usuario_id, "bloqueado": False, "mensaje": "El usuario no está bloqueado por multas"}
+
 @router.get("/total_multas", summary="R7.8 Suma total de multas en el sistema")
 def total_multas(db: Session = Depends(get_db)):
     """Autor: Erick Rangel
