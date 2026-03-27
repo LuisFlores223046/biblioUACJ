@@ -127,6 +127,7 @@ def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
 
     return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
 
+
 @router.get("/prestamosPorAutor/{autor}", summary="R1.8 Dado un autor como parámetro, regresar cuántos libros distintos tiene y cuántos préstamos en total")
 def obtener_prestamos_por_autor(autor: str, db: Session = Depends(get_db)):
     """
@@ -151,3 +152,63 @@ def obtener_prestamos_por_autor(autor: str, db: Session = Depends(get_db)):
         "libros_distintos": libros_distintos,
         "prestamos_totales": prestamos_totales,
     }
+
+@router.get("/mas-prestados", summary="R1.6 Listar libros por total de prestamos")
+def listar_libros_mas_prestados(db: Session = Depends(get_db)):
+    """
+    Lista los libros ordenados de mayor a menor por cantidad total de prestamos.
+    """
+    resultado = (
+        db.query(
+            Libro.id,
+            Libro.titulo,
+            Libro.autor,
+            Libro.isbn,
+            Libro.cantidad,
+            Libro.disponible,
+            func.count(Prestamo.id).label("total_prestamos"),
+        )
+        .outerjoin(Prestamo, Prestamo.libro_id == Libro.id)
+        .group_by(Libro.id)
+        .order_by(desc("total_prestamos"), Libro.id.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": fila.id,
+            "titulo": fila.titulo,
+            "autor": fila.autor,
+            "isbn": fila.isbn,
+            "cantidad": fila.cantidad,
+            "disponible": fila.disponible,
+            "total_prestamos": fila.total_prestamos,
+        }
+        for fila in resultado
+    ]
+
+
+@router.get("/nunca-prestados", summary="R1.7 Listar libros nunca prestados")
+def listar_libros_nunca_prestados(db: Session = Depends(get_db)):
+    """
+    Lista los libros que no tienen ningun prestamo registrado.
+    """
+    libros = (
+        db.query(Libro)
+        .outerjoin(Prestamo, Prestamo.libro_id == Libro.id)
+        .filter(Prestamo.id.is_(None))
+        .all()
+    )
+
+    return [
+        {
+            "id": libro.id,
+            "titulo": libro.titulo,
+            "autor": libro.autor,
+            "isbn": libro.isbn,
+            "cantidad": libro.cantidad,
+            "disponible": libro.disponible,
+        }
+        for libro in libros
+    ]
+
