@@ -156,6 +156,41 @@ def total_multas(db: Session = Depends(get_db)):
     total = db.query(Prestamo).with_entities(func.sum(Prestamo.multa)).scalar() or 0.0
     return {"total_multas": float(total)}
 
+@router.get("/calcular_multa/{prestamo_id}", summary="R7.5 Calcular multa")
+def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
+    """
+    Autor: Raúl Esteban Aniles Macias 222802
+    # Funcionalidad: Calcula la multa de un préstamo según días de retraso (5 pesos/día a partir del día 8).
+    """
+    prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
+    if not prestamo:
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
+
+    if prestamo.devuelto and prestamo.fecha_devolucion:
+        fecha_final = prestamo.fecha_devolucion
+    else:
+        fecha_final = datetime.utcnow()
+
+    dias_prestamo = (fecha_final - prestamo.fecha_prestamo).days
+    dias_retraso = dias_prestamo - DIAS_LIMITE
+    multa_calculada = max(0, dias_retraso * COSTO_DIA)
+
+    # Guardar multa calculada para persistencia si aún no está actualizada
+    if prestamo.multa != multa_calculada:
+        prestamo.multa = multa_calculada
+        db.add(prestamo)
+        db.commit()
+        db.refresh(prestamo)
+
+    return {
+        "prestamo_id": prestamo_id,
+        "dias_prestamo": dias_prestamo,
+        "dias_retraso": max(0, dias_retraso),
+        "multa": multa_calculada,
+        "estado_devuelto": prestamo.devuelto,
+        "fecha_devolucion": prestamo.fecha_devolucion,
+    }
+
 
 @router.get("/total_multas", summary="R7.8 Suma total de multas en el sistema")
 def total_multas(db: Session = Depends(get_db)):
@@ -173,13 +208,11 @@ def registrar_pago(prestamo_id: int, db: Session = Depends(get_db)):
     prestamo = db.query(Prestamo).filter(Prestamo.id == prestamo_id).first()
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
-    
+
     if prestamo.multa <= 0:
         return {"message": "No hay multa pendiente para este préstamo", "multa_actual": prestamo.multa}
     
     monto_pagado = prestamo.multa
     prestamo.multa = 0.0
-    db.commit()
-    db.refresh(prestamo)
 
     return {"status": "success", "message": f"Multa de {monto_pagado} pagada correctamente", "nuevo_saldo_multa": prestamo.multa}
