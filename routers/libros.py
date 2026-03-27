@@ -11,7 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
+<<<<<<< HEAD
 from database import get_db, Libro, Prestamo, Usuario
+=======
+from database import get_db, Libro, Prestamo
+>>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
 
 router = APIRouter()
 
@@ -163,6 +167,7 @@ def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
 
     return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
 
+<<<<<<< HEAD
 @router.get("/mas-prestados/{n}", summary="Top N libros más prestados")
 def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
     """
@@ -175,11 +180,46 @@ def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El parámetro 'n' debe ser mayor que 0")
 
     top_libros = (
+=======
+
+@router.get("/prestamosPorAutor/{autor}", summary="R1.8 Dado un autor como parámetro, regresar cuántos libros distintos tiene y cuántos préstamos en total")
+def obtener_prestamos_por_autor(autor: str, db: Session = Depends(get_db)):
+    """
+    **Consultar los prestamos de un autor específico.**
+
+    - **autor**: El autor de los libros que se desean consultar.
+    - **Retorna**: Cantidad de libros distintos y total de préstamos.
+    """
+    libros_db = db.query(Libro).filter(Libro.autor == autor).all()
+    if not libros_db:
+        raise HTTPException(status_code=404, detail="No se encontraron libros para el autor")
+
+    libros_distintos = len(libros_db)
+    libro_ids = [libro.id for libro in libros_db]
+
+    prestamos_totales = db.query(func.count(Prestamo.id)).filter(
+        Prestamo.libro_id.in_(libro_ids)
+    ).scalar()
+
+    return {
+        "autor": autor,
+        "libros_distintos": libros_distintos,
+        "prestamos_totales": prestamos_totales,
+    }
+
+@router.get("/mas-prestados", summary="R1.6 Listar libros por total de prestamos")
+def listar_libros_mas_prestados(db: Session = Depends(get_db)):
+    """
+    Lista los libros ordenados de mayor a menor por cantidad total de prestamos.
+    """
+    resultado = (
+>>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
         db.query(
             Libro.id,
             Libro.titulo,
             Libro.autor,
             Libro.isbn,
+<<<<<<< HEAD
             func.count(Prestamo.id).label("total_prestamos"),
         )
         .join(Prestamo, Prestamo.libro_id == Libro.id)
@@ -194,6 +234,43 @@ def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
             status_code=404,
             detail=f"No hay suficientes libros con préstamos para devolver {n} resultados",
         )
+=======
+            Libro.cantidad,
+            Libro.disponible,
+            func.count(Prestamo.id).label("total_prestamos"),
+        )
+        .outerjoin(Prestamo, Prestamo.libro_id == Libro.id)
+        .group_by(Libro.id)
+        .order_by(desc("total_prestamos"), Libro.id.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": fila.id,
+            "titulo": fila.titulo,
+            "autor": fila.autor,
+            "isbn": fila.isbn,
+            "cantidad": fila.cantidad,
+            "disponible": fila.disponible,
+            "total_prestamos": fila.total_prestamos,
+        }
+        for fila in resultado
+    ]
+
+
+@router.get("/nunca-prestados", summary="R1.7 Listar libros nunca prestados")
+def listar_libros_nunca_prestados(db: Session = Depends(get_db)):
+    """
+    Lista los libros que no tienen ningun prestamo registrado.
+    """
+    libros = (
+        db.query(Libro)
+        .outerjoin(Prestamo, Prestamo.libro_id == Libro.id)
+        .filter(Prestamo.id.is_(None))
+        .all()
+    )
+>>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
 
     return [
         {
@@ -201,8 +278,15 @@ def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
             "titulo": libro.titulo,
             "autor": libro.autor,
             "isbn": libro.isbn,
+<<<<<<< HEAD
             "total_prestamos": libro.total_prestamos,
         }
         for libro in top_libros
+=======
+            "cantidad": libro.cantidad,
+            "disponible": libro.disponible,
+        }
+        for libro in libros
+>>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
     ]
 
