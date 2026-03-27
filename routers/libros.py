@@ -9,8 +9,9 @@ Requerimientos:
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel
-from database import get_db, Libro
+from database import get_db, Libro, Prestamo, Usuario
 
 router = APIRouter()
 
@@ -60,6 +61,42 @@ def listar_libros(db: Session = Depends(get_db)):
     retornamos todos los libros que existen en la base de datos
     """
     return db.query(Libro).all()
+
+
+@router.get("/prestados/actualmente", summary="Listar libros prestados actualmente")
+def listar_libros_prestados_actualmente(db: Session = Depends(get_db)):
+    """
+    Lista los libros que están prestados en este momento e incluye el nombre
+    del usuario que tiene cada préstamo activo.
+    """
+    prestamos_activos = (
+        db.query(Prestamo, Libro, Usuario)
+        .join(Libro, Prestamo.libro_id == Libro.id)
+        .join(Usuario, Prestamo.usuario_id == Usuario.id)
+        .filter(Prestamo.devuelto == False)
+        .order_by(Prestamo.fecha_prestamo.desc())
+        .all()
+    )
+
+    return [
+        {
+            "prestamo_id": prestamo.id,
+            "fecha_prestamo": prestamo.fecha_prestamo,
+            "libro": {
+                "id": libro.id,
+                "titulo": libro.titulo,
+                "autor": libro.autor,
+                "isbn": libro.isbn,
+            },
+            "usuario": {
+                "id": usuario.id,
+                "nombre": usuario.nombre,
+                "matricula": usuario.matricula,
+            },
+        }
+        for prestamo, libro, usuario in prestamos_activos
+    ]
+
 
 @router.get("/{libro_id}", summary="R1.3 Consultar libro por ID")
 def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
@@ -125,3 +162,47 @@ def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
+
+@router.get("/mas-prestados/{n}", summary="Top N libros más prestados")
+def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
+    """
+    Regresa los `n` libros más prestados, ordenados de mayor a menor por número de préstamos.
+
+    - `n=3` regresa exactamente 3 libros (si existen al menos 3 con préstamos).
+    - `n=1` regresa exactamente 1 libro (si existe al menos 1 con préstamos).
+    """
+    if n <= 0:
+        raise HTTPException(status_code=400, detail="El parámetro 'n' debe ser mayor que 0")
+
+    top_libros = (
+        db.query(
+            Libro.id,
+            Libro.titulo,
+            Libro.autor,
+            Libro.isbn,
+            func.count(Prestamo.id).label("total_prestamos"),
+        )
+        .join(Prestamo, Prestamo.libro_id == Libro.id)
+        .group_by(Libro.id, Libro.titulo, Libro.autor, Libro.isbn)
+        .order_by(func.count(Prestamo.id).desc(), Libro.id.asc())
+        .limit(n)
+        .all()
+    )
+
+    if len(top_libros) < n:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No hay suficientes libros con préstamos para devolver {n} resultados",
+        )
+
+    return [
+        {
+            "id": libro.id,
+            "titulo": libro.titulo,
+            "autor": libro.autor,
+            "isbn": libro.isbn,
+            "total_prestamos": libro.total_prestamos,
+        }
+        for libro in top_libros
+    ]
+
