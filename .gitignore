@@ -1,7 +1,21 @@
+# Entorno Virtual
 venv/
-env/
 .venv/
+env/
+ENV/
+bin/
+lib/
+share/
+
+# Base de Datos (SQLite por defecto en FastAPI/SQLAlchemy)
+*.sqlite
+*.sqlite3
+*.db
+
+# Python cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+
+# Variables de entorno (Sensible)
+.env
