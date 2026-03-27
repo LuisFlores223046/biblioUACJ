@@ -9,13 +9,9 @@ Requerimientos:
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from pydantic import BaseModel
-<<<<<<< HEAD
 from database import get_db, Libro, Prestamo, Usuario
-=======
-from database import get_db, Libro, Prestamo
->>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
 
 router = APIRouter()
 
@@ -102,7 +98,7 @@ def listar_libros_prestados_actualmente(db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/{libro_id}", summary="R1.3 Consultar libro por ID")
+@router.get("/{libro_id:int}", summary="R1.3 Consultar libro por ID")
 def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
     """
     **Consultar un libro específico por su identificador único.**
@@ -116,7 +112,7 @@ def obtener_libro(libro_id: int, db: Session = Depends(get_db)):
 
     return libro_db
 
-@router.put("/{libro_id}", summary="R1.4 Actualizar libro")
+@router.put("/{libro_id:int}", summary="R1.4 Actualizar libro")
 def actualizar_libro(libro_id: int, libro: LibroCreate, db: Session = Depends(get_db)):
     """
     Actualiza los datos de un libro por su ID.
@@ -149,7 +145,7 @@ def actualizar_libro(libro_id: int, libro: LibroCreate, db: Session = Depends(ge
         },
     }
 
-@router.delete("/{libro_id}", summary="R1.5 Eliminar libro")
+@router.delete("/{libro_id:int}", summary="R1.5 Eliminar libro")
 def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
     """
     **Eliminar un libro de la base de datos de forma permanente.**
@@ -167,20 +163,6 @@ def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
 
     return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
 
-<<<<<<< HEAD
-@router.get("/mas-prestados/{n}", summary="Top N libros más prestados")
-def top_n_libros_mas_prestados(n: int, db: Session = Depends(get_db)):
-    """
-    Regresa los `n` libros más prestados, ordenados de mayor a menor por número de préstamos.
-
-    - `n=3` regresa exactamente 3 libros (si existen al menos 3 con préstamos).
-    - `n=1` regresa exactamente 1 libro (si existe al menos 1 con préstamos).
-    """
-    if n <= 0:
-        raise HTTPException(status_code=400, detail="El parámetro 'n' debe ser mayor que 0")
-
-    top_libros = (
-=======
 
 @router.get("/prestamosPorAutor/{autor}", summary="R1.8 Dado un autor como parámetro, regresar cuántos libros distintos tiene y cuántos préstamos en total")
 def obtener_prestamos_por_autor(autor: str, db: Session = Depends(get_db)):
@@ -213,28 +195,11 @@ def listar_libros_mas_prestados(db: Session = Depends(get_db)):
     Lista los libros ordenados de mayor a menor por cantidad total de prestamos.
     """
     resultado = (
->>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
         db.query(
             Libro.id,
             Libro.titulo,
             Libro.autor,
             Libro.isbn,
-<<<<<<< HEAD
-            func.count(Prestamo.id).label("total_prestamos"),
-        )
-        .join(Prestamo, Prestamo.libro_id == Libro.id)
-        .group_by(Libro.id, Libro.titulo, Libro.autor, Libro.isbn)
-        .order_by(func.count(Prestamo.id).desc(), Libro.id.asc())
-        .limit(n)
-        .all()
-    )
-
-    if len(top_libros) < n:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No hay suficientes libros con préstamos para devolver {n} resultados",
-        )
-=======
             Libro.cantidad,
             Libro.disponible,
             func.count(Prestamo.id).label("total_prestamos"),
@@ -270,7 +235,6 @@ def listar_libros_nunca_prestados(db: Session = Depends(get_db)):
         .filter(Prestamo.id.is_(None))
         .all()
     )
->>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
 
     return [
         {
@@ -278,15 +242,9 @@ def listar_libros_nunca_prestados(db: Session = Depends(get_db)):
             "titulo": libro.titulo,
             "autor": libro.autor,
             "isbn": libro.isbn,
-<<<<<<< HEAD
-            "total_prestamos": libro.total_prestamos,
-        }
-        for libro in top_libros
-=======
             "cantidad": libro.cantidad,
             "disponible": libro.disponible,
         }
         for libro in libros
->>>>>>> 656a57c065943b4925b0202a55294cec3488ad4c
     ]
 
