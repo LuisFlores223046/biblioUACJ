@@ -9,8 +9,9 @@ Requerimientos:
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel
-from database import get_db, Libro
+from database import get_db, Libro, Prestamo
 
 router = APIRouter()
 
@@ -125,3 +126,28 @@ def eliminar_libro(libro_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"mensaje": "Libro eliminado correctamente", "libro_id": libro_id}
+
+@router.get("/prestamosPorAutor/{autor}", summary="R1.8 Dado un autor como parámetro, regresar cuántos libros distintos tiene y cuántos préstamos en total")
+def obtener_prestamos_por_autor(autor: str, db: Session = Depends(get_db)):
+    """
+    **Consultar los prestamos de un autor específico.**
+
+    - **autor**: El autor de los libros que se desean consultar.
+    - **Retorna**: Cantidad de libros distintos y total de préstamos.
+    """
+    libros_db = db.query(Libro).filter(Libro.autor == autor).all()
+    if not libros_db:
+        raise HTTPException(status_code=404, detail="No se encontraron libros para el autor")
+
+    libros_distintos = len(libros_db)
+    libro_ids = [libro.id for libro in libros_db]
+
+    prestamos_totales = db.query(func.count(Prestamo.id)).filter(
+        Prestamo.libro_id.in_(libro_ids)
+    ).scalar()
+
+    return {
+        "autor": autor,
+        "libros_distintos": libros_distintos,
+        "prestamos_totales": prestamos_totales,
+    }
