@@ -190,3 +190,10 @@ def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
         "estado_devuelto": prestamo.devuelto,
         "fecha_devolucion": prestamo.fecha_devolucion,
     }
+
+@router.get("/usuarios_conmulta", summary="R7.6 Listar usuarios con multa")
+def usuarios_multados(db:Session = Depends(get_db)):
+    prestamos = db.query(Prestamo.usuario_id).filter(Prestamo.multa > 0.0).subquery()
+    usuarios = db.query(Usuario)\
+        .filter(Usuario.id.in_(prestamos)).all() 
+    return usuarios
