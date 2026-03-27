@@ -191,6 +191,12 @@ def calcular_multa(prestamo_id: int, db: Session = Depends(get_db)):
         "fecha_devolucion": prestamo.fecha_devolucion,
     }
 
+@router.get("/usuarios_conmulta", summary="R7.6 Listar usuarios con multa")
+def usuarios_multados(db:Session = Depends(get_db)):
+    prestamos = db.query(Prestamo.usuario_id).filter(Prestamo.multa > 0.0).subquery()
+    usuarios = db.query(Usuario)\
+        .filter(Usuario.id.in_(prestamos)).all() 
+    return usuarios
 
 @router.get("/total_multas", summary="R7.8 Suma total de multas en el sistema")
 def total_multas(db: Session = Depends(get_db)):
@@ -199,6 +205,7 @@ def total_multas(db: Session = Depends(get_db)):
     """
     total_multas = db.query(func.sum(Prestamo.multa)).scalar() or 0.0
     return {"total_multas": float(total_multas)}
+
 
 @router.put("/registrar_pago/{prestamo_id}", summary="R7.9 Registrar pago de multa")
 def registrar_pago(prestamo_id: int, db: Session = Depends(get_db)):
